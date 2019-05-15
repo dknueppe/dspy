@@ -1,11 +1,11 @@
 #%%
 from scipy import signal
 import numpy as np
-import numpy.fft as npfft
 import matplotlib.pyplot as plt
+import sounddevice as sd
 
 def linspace(start, stop, dt):
-    return np.linspace(start, stop, int(round((stop - start)/dt)), endpoint=False)
+    return np.linspace(start, stop, int(round((stop - start)/dt)), endpoint=True)
 
 class Signal:
 
@@ -15,12 +15,14 @@ class Signal:
         self.x_val = x_val
         self.y_val = y_val
         self.domain = domain
-        self.dt = np.mean(np.diff(x_val))
+        self.dt = x_val[1] - x_val[0]
         self.fs = 1/self.dt
         self.title = title
 
     def fft(self):
-        return Signal(npfft.fft(self.y_val), npfft.fftfreq(self.y_val.size, self.dt), domain='frequency')
+        x = np.fft.fftshift(np.fft.fftfreq(self.x_val.size, self.dt))
+        y = np.fft.fftshift(np.fft.fft(self.y_val))
+        return Signal(x, y, domain='frequency', title='Spectrum')
 
     def conv(self, sig):
         filtered = signal.convolve(self.y_val, sig.y_val, mode='full')
@@ -31,12 +33,14 @@ class Signal:
 
     def pad(self, common_x, fill = None):
         padding = common_x.size -self.x_val.size
-        front_pad = int(round(abs((common_x[0] - self.x_val[0])) / np.mean(np.diff(self.x_val))))
+        if self.domain == 'time':
+            front_pad = int(round(abs((common_x[0] - self.x_val[0])) / np.mean(np.diff(self.x_val))))
+            #print(common_x[0], common_x[-1], self.x_val[0], self.x_val[-1])
+            #print(padding, front_pad, back_pad)
+        else :
+            front_pad = padding // 2
         back_pad = padding - front_pad
-        #print(common_x[0], common_x[-1], self.x_val[0], self.x_val[-1])
-        #print(padding, front_pad, back_pad)
-        return np.pad(self.y_val, (front_pad, back_pad), 'constant', constant_values=(fill, fill)) 
-
+        return np.pad(self.y_val, (front_pad, back_pad), 'constant', constant_values=(fill, fill))
 
     @classmethod
     def from_func(cls, func, start, stop, dt, **kwargs):
@@ -46,14 +50,16 @@ class Signal:
 
     @staticmethod
     def common_time(signals):
-        t_min = signals[0].x_val[0]
-        t_max = signals[0].x_val[-1]
+        if isinstance(signals, Signal):
+            return signals.x_val
+        x_min = signals[0].x_val[0]
+        x_max = signals[0].x_val[-1]
         for signal in signals:
             if signal.domain == 'time':
-                t_min = signal.x_val[0] if t_min > signal.x_val[0] else t_min
-                t_max = signal.x_val[-1] if t_max < signal.x_val[-1] else t_max
-        return np.linspace(t_min, t_max, round((t_max - t_min)/np.mean(np.diff(signals[0].x_val))) + 1)
-        #return linspace(t_min, t_max, signals[0].dt)
+                x_min = signal.x_val[0] if x_min > signal.x_val[0] else x_min
+                x_max = signal.x_val[-1] if x_max < signal.x_val[-1] else x_max
+        return np.linspace(x_min, x_max, round((x_max - x_min)/np.mean(np.diff(signals[0].x_val))) + 1)
+        #return linspace(x_min, x_max, signals[0].dt)
     
     @staticmethod
     def add(signals):
@@ -65,29 +71,56 @@ class Signal:
 
     @staticmethod
     def plot(signals, columns=1, *args, **kwargs):
-        common_x = Signal.common_time(signals)
-        n = len(signals)
-        fig, subs = plt.subplots(int(n/columns), columns, sharex=True)
+        if isinstance(signals, Signal):
+            fig = plt.figure(figsize=(10,90/21))
+            if signals.domain == 'frequency':
+                plt.plot(signals.x_val, abs(signals.y_val)/signals.y_val.size)
+            else:
+                plt.plot(signals.x_val, signals.y_val)
+            plt.grid(True)
+            plt.title(signals.title)
 
-        for signal, subplot in zip(signals, subs):
-            y = signal.pad(common_x)
-            subplot.set_title(signal.title)
-            subplot.plot(common_x, y)
-            subplot.grid(True)
+        else:
+            common_x = Signal.common_time(signals)
+            n = len(signals)
+            fig, subs = plt.subplots(int(n/columns), columns, figsize=(10,90/21*n/columns), sharex=False)
+
+            for signal, subplot in zip(signals, subs):
+                y = signal.pad(common_x)
+                subplot.set_title(signal.title)
+                if signal.domain == 'frequency':
+                    subplot.plot(common_x, abs(y)/y.size)
+                else:
+                    subplot.plot(common_x, y)
+                subplot.grid(True)
     
         fig.tight_layout()
         fig.show()
 
 # Test for custom stuff
 f = lambda t: 5* np.sin(2*np.pi*t)
-t0 = linspace(0, 2*np.pi, 0.1)
+t0 = linspace(-2*np.pi, 2*np.pi, 0.1)
 t1 = linspace(-2*np.pi, 0, 0.1)
 y0 = np.sin(t0)
 y1 = np.cos(t1)
 foo = Signal(t0, y0 * 5, title='Sinus')
 bar = Signal(t1, y1, title='Cosinus')
 foobar = Signal.from_func(f, -3*np.pi, 3*np.pi, 0.1)
+print(foobar.dt)
 t2 = linspace(-3*np.pi, 3*np.pi, 0.1)
 test = Signal(t2, f(t2))
-Signal.plot((foo, test, Signal.add((foo, test))))
-#Signal.plot(test.fft())
+selection = (foo, bar, foobar, test, Signal.add((foobar, test)))
+Signal.plot(selection)
+Signal.plot(test.fft())
+
+
+#%%
+import sounddevice as sd
+import numpy as np
+
+fs = 44100
+duration = 3
+tone = 20
+t = np.linspace(0, tone*duration, fs*duration)
+output = 2 * np.sin(2*np.pi*tone*t)
+sd.play(output, fs)
