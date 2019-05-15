@@ -116,6 +116,11 @@ Signal.plot(test)
 Signal.plot(test.fft())
 Signal.plot((test, test.fft()),columns=2)
 
+#DTMF
+upper_freq = (1029, 1336, 1477)
+lower_freq = (697, 770, 852, 941)
+keys = {1=(0, 0)}
+
 
 #%%
 import sounddevice as sd
