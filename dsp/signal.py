@@ -24,6 +24,9 @@ class Signal:
         y = np.fft.fftshift(np.fft.fft(self.y_val))
         return Signal(x, y, domain='frequency', title='Spectrum')
 
+    def ifft(self):
+        x = np.fft.fftshift()
+
     def conv(self, sig):
         filtered = signal.convolve(self.y_val, sig.y_val, mode='full')
         x_min = min(self.x_val) + min(sig.x_val)
@@ -35,8 +38,6 @@ class Signal:
         padding = common_x.size -self.x_val.size
         if self.domain == 'time':
             front_pad = int(round(abs((common_x[0] - self.x_val[0])) / np.mean(np.diff(self.x_val))))
-            #print(common_x[0], common_x[-1], self.x_val[0], self.x_val[-1])
-            #print(padding, front_pad, back_pad)
         else :
             front_pad = padding // 2
         back_pad = padding - front_pad
@@ -83,13 +84,13 @@ class Signal:
         else:
             common_x = Signal.common_time(signals)
             n = len(signals)
-            fig, subs = plt.subplots(int(n/columns), columns, figsize=(10,90/21*n/columns), sharex=False)
+            fig, subs = plt.subplots(int(n/columns), columns, figsize=(10,90/21*n/columns), sharex='col')
 
             for signal, subplot in zip(signals, subs):
                 y = signal.pad(common_x)
                 subplot.set_title(signal.title)
                 if signal.domain == 'frequency':
-                    subplot.plot(common_x, abs(y)/y.size)
+                    subplot.plot(signal.x_val, abs(y)/y.size)
                 else:
                     subplot.plot(common_x, y)
                 subplot.grid(True)
@@ -109,9 +110,11 @@ foobar = Signal.from_func(f, -3*np.pi, 3*np.pi, 0.1)
 print(foobar.dt)
 t2 = linspace(-3*np.pi, 3*np.pi, 0.1)
 test = Signal(t2, f(t2))
-selection = (foo, bar, foobar, test, Signal.add((foobar, test)))
+selection = (foo, bar, foobar, test, Signal.add((foo, test)))
 Signal.plot(selection)
+Signal.plot(test)
 Signal.plot(test.fft())
+Signal.plot((test, test.fft()),columns=2)
 
 
 #%%
