@@ -156,10 +156,16 @@ lower_freq = (697, 770, 852, 941)
 #%%
 import sounddevice as sd
 import numpy as np
+import scipy.io.wavfile as wav
 
+# Tone generation
 fs = 44100
 duration = 3
 tone = 1000
 t = np.linspace(0, tone*duration, fs*duration)
 output = 20 * np.sin(2*np.pi*tone*t)
-sd.play(output, fs)
+#sd.play(output, fs)
+
+# playing .wav
+FSample, samples = wav.read('/home/d/Downloads/audio_2.wav')
+sd.play(samples, FSample)
