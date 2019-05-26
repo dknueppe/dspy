@@ -8,6 +8,9 @@ from functools              import singledispatch
 from scipy                  import signal
 from IPython.display        import Audio
 
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
+
 def linspace(start, stop, fs):
     return np.linspace(start, stop, int(round((stop - start) * fs)) + 1, endpoint=True)
 
@@ -33,6 +36,7 @@ class Signal:
             self.fs = int(round(1./(1. / (-2. * x_min))))
         else:
             raise ValueError("Signal must be either 'frequency' or 'time' domain")
+        print(self.fs)
         self.__x_val = x_val
         self.__y_val = y_val
         self.domain = domain
@@ -136,11 +140,55 @@ class Signal:
             return np.pad(np.fft.fftshift(self.__y_val), (front_pad, back_pad), 'constant', constant_values=(fill, fill))
 
     def play_sound(self):
-        print(self.domain, self.fs)
-        if self.domain == 'frequency' or self.fs >= 50000:
-            raise ValueError('cannot play sound from this array (either it is freqdomain or sampled to quick')
+        if  self.fs >= 50000:
+            raise ValueError('frequency to high')
+        if self.domain == 'frequency':
+            raise DomainError('cannot play frequency domain signals')
         sd.play(self.__y_val, self.fs)
         #Audio(data=self.__y_val, rate=self.fs, autoplay=True)
+
+    def plot_properties(self):
+
+        fig, subs= plt.subplots(3, 2, figsize=(12, 90 / 16), dpi=120)
+
+        titles =  (r'\textbf{Signal}',
+                   r'\textbf{Spektrum}',
+                   r'\textbf{Realteil}',
+                   r'\textbf{Betrag}',
+                   r'\textbf{Imaginärteil}',
+                   r'\textbf{Phase}')
+
+        xlabels = (r'\textit{t}$[s]$',
+                   r'\textit{f}$[kHz]$',
+                   r'\textit{t}$[s]$',
+                   r'\textit{t}$[s]$',
+                   r'\textit{t}$[s]$',
+                   r'\textit{t}$[s]$')
+
+        ylabels = ('Amplitude',
+                   'Amplitude',
+                   r'$\Re\{f(t)\}$',
+                   r'${|f(t)|}$',
+                   r'$\Im\{f(t)\}$',
+                   r'$\angle\{f(t)\}$')
+
+        values = ((self.__x_val, self.__y_val),
+                  (np.fft.fftshift(self.fft.__x_val / 1000), np.fft.fftshift(self.fft.__y_val) / self.size),
+                  (self.__x_val, self.__y_val.real),
+                  (self.__x_val, np.abs(self.__y_val)),
+                  (self.__x_val, self.__y_val.imag),
+                  (self.__x_val, np.angle(self.__y_val.real)))
+                  
+
+
+        for subplot, title, xlabel, ylabel, value in zip(subs.flat, titles, xlabels, ylabels, values):
+            subplot.plot(value[0], value[1])
+            subplot.set_title(title)
+            subplot.set(xlabel=xlabel,ylabel=ylabel)
+            subplot.grid(True)
+        
+        fig.tight_layout()
+        fig.show()
 
     @staticmethod
     def common_time(*args):
@@ -148,7 +196,6 @@ class Signal:
         total_max = args[-1].time_frame.stop
         for signal in args:
             if signal.domain == 'time':
-               # raise DomainError('no common time for frequency domain signals')
                 x_min = signal.time_frame.start
                 x_max = signal.time_frame.stop
                 total_min = x_min if x_min < total_min else total_min
@@ -167,7 +214,7 @@ class Signal:
             elif signal.domain == 'frequency':
                 x = signal.__x_val
                 y = np.abs(signal.__y_val / signal.size)
-            fig = plt.figure()
+            fig = plt.figure(figsize=(12, 90 / 16), dpi=120)
             plt.title(signal.title)
             plt.plot(x, y)
             plt.grid(True)
@@ -177,7 +224,7 @@ class Signal:
             sharex = kwargs.get('sharex', False)
             common_x, timeframe = Signal.common_time(*args)
             rows =  math.ceil(len(args) / cols)
-            fig, subs = plt.subplots(rows, cols, figsize=(10, 90 / 21 * rows), sharex=sharex)
+            fig, subs = plt.subplots(rows, cols, figsize=(10, 90 / 21 * rows), dpi=120, sharex=sharex)
             for signal, subplot in zip(args, subs.flat):
                 if signal.domain == 'time':
                     if sharex == False:
@@ -191,7 +238,7 @@ class Signal:
                 elif signal.domain == 'frequency':
                     if sharex == False:
                         x = signal._Signal__x_val
-                        y = np.abs(np.fft.fftshift(signal._Signal__y_val / signal.size)) 
+                        y = np.abs(signal._Signal__y_val / signal.size)
                     elif sharex == True:
                         x = np.fft.fftshift(np.fft.fftfreq(common_x.size, signal.dt)) 
                         y = np.abs(signal.padded(common_x) / signal.size)
@@ -204,63 +251,33 @@ class Signal:
             fig.tight_layout()
             fig.show()
 
-
-#@singledispatch
-#def _plot(*args, **kwargs):
-#    if kwargs.pop('verbose', False):
-#        print(type(args))
-#        print(args)
-#
-#@_plot.register(Signal)
-#def _(args, **kwargs):
-#    plt.title(args.title)
-#    plt.plot(args._Signal__x_val, args._Signal__y_val)
-#    plt.grid(True)
-#    plt.show()
-
-
 #%%
 # Test for custom stuff
-#f = lambda t: 5* np.sin(2*np.pi*t)
-#t0 = linspace(-2*np.pi, 2*np.pi, 0.1)
-#t1 = linspace(-2*np.pi, 0, 0.1)
-#y0 = np.sin(t0)
-#y1 = np.cos(t1)
-#t2 = t0 + 3
-#y2 = np.zeros(t2.size)
-#y2[y2.size // 2 :] = 1
-#foo = Signal(t0, y0 * 5, title='Sinus')
-#bar = Signal(t2, y2 * 5, title='Heaviside')
-#foobar = Signal.from_func(f, -3*np.pi, 3*np.pi, 0.1)
-#Signal.plot(foo)
-#Signal.plot(foo, bar, foobar, foobar + foo + bar)
-#
-#def cos_add():
-#    t = linspace(-0.1, 0.1, 0.0002)
-#    f = lambda k : (1 / (k + 1)) * np.cos(2 * np.pi * k * 250 * t)
-#    y = np.zeros(t.size)
-#    for n in range(6):
-#        y += f(n)
-#    return Signal(t, y, time_frame=(-0.1, 0.1))
-#fourier = cos_add()
-#Signal.plot(fourier)
-#fft = fourier.fft
-#Signal.plot(fft)
+f = lambda t: 5* np.sin(2*np.pi*t)
+t0 = linspace(-2*np.pi, 2*np.pi, 10)
+t1 = linspace(-2*np.pi, 0, 10)
+y0 = np.sin(t0)
+y1 = np.cos(t1)
+t2 = t0 + 3
+y2 = np.zeros(t2.size)
+y2[y2.size // 2 :] = 1
+foo = Signal(t0, y0 * 5, title='Sinus')
+bar = Signal(t2, y2 * 5, title='Heaviside')
+foobar = Signal.from_func(f, -3*np.pi, 3*np.pi, 10)
+Signal.plot(foo)
+Signal.plot(foo, bar, foobar, foobar + foo + bar)
 
-#print(foo)
-#print(foobar.dt)
-#t2 = linspace(-3*np.pi, 3*np.pi, 0.1)
-#test = Signal(t2, f(t2))
-#selection = (foo, foo.fft)
-#Signal.plot(foobar.fft(), columns=2)
-#Signal.plot(test)
-#Signal.plot(test.fft())
-#Signal.plot((test, test.fft()),columns=2)
-#test_time = linspace(0, 3, 0.0003)
-#test_freq = np.fft.fftfreq(test_time.size, 1/np.mean(np.diff(test_time)))
-#print("dt from test_freq = ", np.mean(np.diff(np.fft.fftshift(test_freq))))
-#test_time_from_freq = ifftfreq(min(test_freq), max(test_freq), (0,3), test_freq.size)
-#print("test_time_from_freq = ", test_time_from_freq)
+def cos_add():
+    t = linspace(-0.1, 0.1, 5000)
+    f = lambda k : (1 / (k + 1)) * np.cos(2 * np.pi * k * 250 * t)
+    y = np.zeros(t.size)
+    for n in range(6):
+        y += f(n)
+    return Signal(t, y, time_frame=(-0.1, 0.1))
+fourier = cos_add()
+Signal.plot(fourier)
+fft = fourier.fft
+Signal.plot(fft)
 
 #%%
 import scipy.io.wavfile as wav
@@ -270,13 +287,14 @@ audio1 = Signal.from_wav(audio, title='War of the Worlds (interence)')
 audio = wav.read('/home/daniel/Downloads/audio_2.wav')
 audio2 = Signal.from_wav(audio)
 #plt.plot(np.linspace(0,samples.size/FSample, samples.size), samples)
-#Signal.plot(audio1, audio2, audio1.fft, audio2.fft)
+Signal.plot(audio1, audio2, audio1.fft, audio2.fft)
 Signal.plot(audio1, audio1.fft.ifft, columns=1)
-Signal.plot(audio2.fft)
-#Signal.plot(audio1)
-#Signal.plot(audio2)
-#Signal.plot(audio1.fft, audio2.fft, columns=1)
-audio1.play_sound()
+Signal.plot(audio1.fft)
+audio1.plot_properties()
+Signal.plot(audio1)
+Signal.plot(audio2)
+Signal.plot(audio1.fft, audio2.fft, columns=1)
+#audio1.play_sound()
 
 #%%
 #DTMF
