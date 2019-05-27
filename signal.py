@@ -12,6 +12,9 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 
 def linspace(start, stop, fs):
+    """Creates a numpy ndarray containing values from start to stop (both inclusive) where
+       the difference array[n + 1] - array[n] is equal to the reciprocal of fs
+    """
     return np.linspace(start, stop, int(round((stop - start) * fs)) + 1, endpoint=True)
 
 TimeFrame = collections.namedtuple('TimeFrame', 'start stop')
@@ -133,11 +136,14 @@ class Signal:
         if self.domain == 'time':
             front_pad = int(abs(common_x[0] - self.__x_val[0]) // self.dt)
             back_pad = padding - front_pad
-            return np.pad(self.__y_val, (front_pad, back_pad), 'constant', constant_values=(fill, fill))
+            return np.pad(self.__y_val, (front_pad, back_pad), \
+                'constant', constant_values=(fill, fill))
         else :
             front_pad = padding // 2
             back_pad = padding - front_pad
-            return np.pad(np.fft.fftshift(self.__y_val), (front_pad, back_pad), 'constant', constant_values=(fill, fill))
+            return np.pad(np.fft.fftshift(self.__y_val), \
+                (front_pad, back_pad), 'constant', \
+                constant_values=(fill, fill))
 
     def play_sound(self):
         if  self.fs >= 50000:
@@ -166,22 +172,22 @@ class Signal:
                    r'\textit{t}$[s]$')
 
         ylabels = ('Amplitude',
-                   'Amplitude',
+                   r'$|H(e^{j{\omega}T}|$',
                    r'$\Re\{f(t)\}$',
                    r'${|f(t)|}$',
                    r'$\Im\{f(t)\}$',
                    r'$\angle\{f(t)\}$')
 
         values = ((self.__x_val, self.__y_val),
-                  (np.fft.fftshift(self.fft.__x_val / 1000), np.fft.fftshift(self.fft.__y_val) / self.size),
+                  (np.fft.fftshift(self.fft.__x_val / 1000), \
+                      np.fft.fftshift(self.fft.__y_val) / self.size),
                   (self.__x_val, self.__y_val.real),
                   (self.__x_val, np.abs(self.__y_val)),
                   (self.__x_val, self.__y_val.imag),
                   (self.__x_val, np.angle(self.__y_val.real)))
                   
-
-
-        for subplot, title, xlabel, ylabel, value in zip(subs.flat, titles, xlabels, ylabels, values):
+        for subplot, title, xlabel, ylabel, value in \
+            zip(subs.flat, titles, xlabels, ylabels, values):
             subplot.plot(value[0], value[1])
             subplot.set_title(title)
             subplot.set(xlabel=xlabel,ylabel=ylabel)
@@ -265,7 +271,7 @@ foo = Signal(t0, y0 * 5, title='Sinus')
 bar = Signal(t2, y2 * 5, title='Heaviside')
 foobar = Signal.from_func(f, -3*np.pi, 3*np.pi, 10)
 Signal.plot(foo)
-Signal.plot(foo, bar, foobar, foobar + foo + bar)
+Signal.plot(foo, bar, foobar, foobar + foo + bar, sharex=True)
 
 def cos_add():
     t = linspace(-0.1, 0.1, 5000)
