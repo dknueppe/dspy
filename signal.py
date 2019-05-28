@@ -6,6 +6,7 @@ import numpy                as     np
 import sounddevice          as     sd
 from functools              import singledispatch
 from scipy                  import signal
+import scipy.io.wavfile     as     wav
 from IPython.display        import Audio
 
 plt.rc('text', usetex=True)
@@ -39,7 +40,6 @@ class Signal:
             self.fs = int(round(1./(1. / (-2. * x_min))))
         else:
             raise ValueError("Signal must be either 'frequency' or 'time' domain")
-        print(self.fs)
         self.__x_val = x_val
         self.__y_val = y_val
         self.domain = domain
@@ -54,9 +54,9 @@ class Signal:
         return Signal(x, y, time_frame=(start, stop), **kwargs)
     
     @classmethod
-    def from_wav(cls, wav, **kwargs):
+    def from_wav(cls, audio, **kwargs):
         title = kwargs.get('title', 'Signal')
-        FSample, samples = wav
+        FSample, samples = wav.read(audio)
         t = np.linspace(0, samples.size / FSample, samples.size)
         return Signal(t, samples, title=title)
 
@@ -65,19 +65,22 @@ class Signal:
         sig_sum = np.zeros(common_x.size)
         sig_sum += self.padded(common_x, 0)
         sig_sum += signal.padded(common_x, 0)
-        return Signal(common_x, sig_sum, time_frame=timeframe)
+        return Signal(common_x, sig_sum,title=self.title + ' + ' + signal.title,\
+            time_frame=timeframe)
     
     def __sub__(self, signal):
         common_x, timeframe = Signal.common_time(self, signal)
         sig_sum = np.zeros(common_x.size)
         sig_sum -= self.padded(common_x, 0)
         sig_sum -= signal.padded(common_x, 0)
-        return Signal(common_x, sig_sum, time_frame=timeframe)
+        return Signal(common_x, sig_sum,title=self.title + ' - ' + signal.title,\
+            time_frame=timeframe)
 
     def __mult__(self, signal):
         common_x, timeframe = Signal.common_time(self, signal)
         sig_prod = self.padded(common_x, 0) * signal.padded(common_x, 0)
-        return Signal(common_x, sig_prod, time_frame=timeframe)
+        return Signal(common_x, sig_prod,title=self.title + ' * ' + signal.title,\
+            time_frame=timeframe)
 
     def __iter__(self):
         return self
@@ -93,6 +96,18 @@ class Signal:
     def size(self):
         return self.__x_val.size
 
+    @property
+    def max(self):
+        return max(self.__x_val)
+
+    @property
+    def min(self):
+        return min(self.__x_val)
+
+    @property
+    def mean(self):
+        return np.mean(self.__x_val)
+    
     @property
     def fft(self):
         x = np.fft.fftfreq(self.__x_val.size, self.dt)
@@ -150,11 +165,13 @@ class Signal:
             raise ValueError('frequency to high')
         if self.domain == 'frequency':
             raise DomainError('cannot play frequency domain signals')
-        sd.play(self.__y_val, self.fs)
-        #Audio(data=self.__y_val, rate=self.fs, autoplay=True)
+        #sd.play(self.__y_val, self.fs)
+        Audio(data=self.__y_val, rate=self.fs, autoplay=True)
+
+    def save_as_wav(self, name='Signals.wav'):
+        wav.write(name, self.fs, self.__y_val)
 
     def plot_properties(self):
-
         fig, subs= plt.subplots(3, 2, figsize=(12, 90 / 16), dpi=120)
 
         titles =  (r'\textbf{Signal}',
@@ -180,7 +197,7 @@ class Signal:
 
         values = ((self.__x_val, self.__y_val),
                   (np.fft.fftshift(self.fft.__x_val / 1000), \
-                      np.fft.fftshift(self.fft.__y_val) / self.size),
+                      np.abs(np.fft.fftshift(self.fft.__y_val)) / self.size),
                   (self.__x_val, self.__y_val.real),
                   (self.__x_val, np.abs(self.__y_val)),
                   (self.__x_val, self.__y_val.imag),
@@ -217,12 +234,21 @@ class Signal:
             if signal.domain == 'time':
                 x = signal.__x_val
                 y = signal.__y_val
+                plt.plot(x, y)
             elif signal.domain == 'frequency':
-                x = signal.__x_val
-                y = np.abs(signal.__y_val / signal.size)
+                limit = kwargs.get('limit', signal.__y_val[-1])
+                pos_only = kwargs.get('pos_only', False)
+                if pos_only == True:
+                    index = np.where(signal.__y_val > limit)[0][0]
+                    index = signal.size / 2 if index == None
+                    x = signal.__x_val[0 : index]
+                    y = np.abs(signal.__y_val[0 : index]) / index
+                else:
+                    x = signal.__x_val
+                    y = np.abs(signal.__y_val) / signal.size
+                plt.stem(x, y)
             fig = plt.figure(figsize=(12, 90 / 16), dpi=120)
             plt.title(signal.title)
-            plt.plot(x, y)
             plt.grid(True)
             plt.show()
         else:
@@ -241,6 +267,7 @@ class Signal:
                         y = signal.padded(common_x)
                     else:
                         return NotImplemented
+                    subplot.plot(x, y)
                 elif signal.domain == 'frequency':
                     if sharex == False:
                         x = signal._Signal__x_val
@@ -248,61 +275,65 @@ class Signal:
                     elif sharex == True:
                         x = np.fft.fftshift(np.fft.fftfreq(common_x.size, signal.dt)) 
                         y = np.abs(signal.padded(common_x) / signal.size)
+                    subplot.stem(x, y)
                 else:
                     print('How did we get here?')
                     return NotImplemented
-                subplot.plot(x, y)
                 subplot.grid(True)
                 subplot.set_title(signal.title)
             fig.tight_layout()
             fig.show()
 
+##%%
+## Test for custom stuff
+#f = lambda t: 5* np.sin(2*np.pi*t)
+#t0 = linspace(-2*np.pi, 2*np.pi, 10)
+#t1 = linspace(-2*np.pi, 0, 10)
+#y0 = np.sin(t0)
+#y1 = np.cos(t1)
+#t2 = t0 + 3
+#y2 = np.zeros(t2.size)
+#y2[y2.size // 2 :] = 1
+#foo = Signal(t0, y0 * 5, title='Sinus')
+#bar = Signal(t2, y2 * 5, title='Heaviside')
+#foobar = Signal.from_func(f, -3*np.pi, 3*np.pi, 10)
+#Signal.plot(foo)
+#Signal.plot(foo, bar, foobar, foobar + foo + bar, sharex=True)
+#
+#def cos_add():
+#    t = linspace(-0.1, 0.1, 5000)
+#    f = lambda k : (1 / (k + 1)) * np.cos(2 * np.pi * k * 250 * t)
+#    y = np.zeros(t.size)
+#    for n in range(6):
+#        y += f(n)
+#    return Signal(t, y, time_frame=(-0.1, 0.1))
+#fourier = cos_add()
+#Signal.plot(fourier)
+#fft = fourier.fft
+#Signal.plot(fft)
+#
+##%%
+#import scipy.io.wavfile as wav
+#
+#audio = wav.read('/home/daniel/Downloads/audio_1.wav')
+#audio1 = Signal.from_wav(audio, title='War of the Worlds (interence)')
+#audio = wav.read('/home/daniel/Downloads/audio_2.wav')
+#audio2 = Signal.from_wav(audio)
+##plt.plot(np.linspace(0,samples.size/FSample, samples.size), samples)
+#Signal.plot(audio1, audio2, audio1.fft, audio2.fft)
+#Signal.plot(audio1, audio1.fft.ifft, columns=1)
+#Signal.plot(audio1.fft)
+#audio1.plot_properties()
+#Signal.plot(audio1)
+#Signal.plot(audio2)
+#Signal.plot(audio1.fft, audio2.fft, columns=1)
+##audio1.play_sound()
+#
+##%%
+##DTMF
+#upper_freq = (1029, 1336, 1477)
+#lower_freq = (697, 770, 852, 941)
+#
+
+
 #%%
-# Test for custom stuff
-f = lambda t: 5* np.sin(2*np.pi*t)
-t0 = linspace(-2*np.pi, 2*np.pi, 10)
-t1 = linspace(-2*np.pi, 0, 10)
-y0 = np.sin(t0)
-y1 = np.cos(t1)
-t2 = t0 + 3
-y2 = np.zeros(t2.size)
-y2[y2.size // 2 :] = 1
-foo = Signal(t0, y0 * 5, title='Sinus')
-bar = Signal(t2, y2 * 5, title='Heaviside')
-foobar = Signal.from_func(f, -3*np.pi, 3*np.pi, 10)
-Signal.plot(foo)
-Signal.plot(foo, bar, foobar, foobar + foo + bar, sharex=True)
-
-def cos_add():
-    t = linspace(-0.1, 0.1, 5000)
-    f = lambda k : (1 / (k + 1)) * np.cos(2 * np.pi * k * 250 * t)
-    y = np.zeros(t.size)
-    for n in range(6):
-        y += f(n)
-    return Signal(t, y, time_frame=(-0.1, 0.1))
-fourier = cos_add()
-Signal.plot(fourier)
-fft = fourier.fft
-Signal.plot(fft)
-
-#%%
-import scipy.io.wavfile as wav
-
-audio = wav.read('/home/daniel/Downloads/audio_1.wav')
-audio1 = Signal.from_wav(audio, title='War of the Worlds (interence)')
-audio = wav.read('/home/daniel/Downloads/audio_2.wav')
-audio2 = Signal.from_wav(audio)
-#plt.plot(np.linspace(0,samples.size/FSample, samples.size), samples)
-Signal.plot(audio1, audio2, audio1.fft, audio2.fft)
-Signal.plot(audio1, audio1.fft.ifft, columns=1)
-Signal.plot(audio1.fft)
-audio1.plot_properties()
-Signal.plot(audio1)
-Signal.plot(audio2)
-Signal.plot(audio1.fft, audio2.fft, columns=1)
-#audio1.play_sound()
-
-#%%
-#DTMF
-upper_freq = (1029, 1336, 1477)
-lower_freq = (697, 770, 852, 941)
