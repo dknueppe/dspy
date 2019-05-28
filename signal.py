@@ -226,7 +226,7 @@ class Signal:
         common_x = linspace(total_min, total_max, args[0].fs)
         time_frame = TimeFrame(start=total_min, stop=total_max)
         return (common_x, time_frame)
-
+    
     @staticmethod
     def plot(*args, **kwargs):
         if len(args) <= 1:
@@ -234,21 +234,12 @@ class Signal:
             if signal.domain == 'time':
                 x = signal.__x_val
                 y = signal.__y_val
-                plt.plot(x, y)
             elif signal.domain == 'frequency':
-                limit = kwargs.get('limit', signal.__y_val[-1])
-                pos_only = kwargs.get('pos_only', False)
-                if pos_only == True:
-                    index = np.where(signal.__y_val > limit)[0][0]
-                    index = signal.size / 2 if index == None
-                    x = signal.__x_val[0 : index]
-                    y = np.abs(signal.__y_val[0 : index]) / index
-                else:
-                    x = signal.__x_val
-                    y = np.abs(signal.__y_val) / signal.size
-                plt.stem(x, y)
+                x = signal.__x_val
+                y = np.abs(signal.__y_val / signal.size)
             fig = plt.figure(figsize=(12, 90 / 16), dpi=120)
             plt.title(signal.title)
+            plt.plot(x, y)
             plt.grid(True)
             plt.show()
         else:
@@ -267,7 +258,6 @@ class Signal:
                         y = signal.padded(common_x)
                     else:
                         return NotImplemented
-                    subplot.plot(x, y)
                 elif signal.domain == 'frequency':
                     if sharex == False:
                         x = signal._Signal__x_val
@@ -275,10 +265,10 @@ class Signal:
                     elif sharex == True:
                         x = np.fft.fftshift(np.fft.fftfreq(common_x.size, signal.dt)) 
                         y = np.abs(signal.padded(common_x) / signal.size)
-                    subplot.stem(x, y)
                 else:
                     print('How did we get here?')
                     return NotImplemented
+                subplot.plot(x, y)
                 subplot.grid(True)
                 subplot.set_title(signal.title)
             fig.tight_layout()
