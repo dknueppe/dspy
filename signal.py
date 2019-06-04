@@ -67,6 +67,10 @@ class Signal:
         sig_sum += signal.padded(common_x, 0)
         return Signal(common_x, sig_sum,title=self.title + ' + ' + signal.title,\
             time_frame=timeframe)
+
+    def __iadd__(self, signal):
+        self.__y_val += signal
+        return self
     
     def __sub__(self, signal):
         common_x, timeframe = Signal.common_time(self, signal)
@@ -75,6 +79,11 @@ class Signal:
         sig_sum -= signal.padded(common_x, 0)
         return Signal(common_x, sig_sum,title=self.title + ' - ' + signal.title,\
             time_frame=timeframe)
+
+    def __isub__(self, signal):
+        self.__y_val -= signal
+        return self
+
 
     def __mult__(self, signal):
         common_x, timeframe = Signal.common_time(self, signal)
@@ -112,7 +121,7 @@ class Signal:
     def fft(self):
         x = np.fft.fftfreq(self.__x_val.size, self.dt)
         y = np.fft.fft(self.__y_val)
-        return Signal(x, y, domain='frequency', title='Spectrum', time_frame=self.time_frame)
+        return Signal(x, y, domain='frequency', title='Spectrum of ' + self.title, time_frame=self.time_frame)
 
     @property
     def ifft(self):
@@ -121,6 +130,10 @@ class Signal:
         x = linspace(start, stop, self.fs)
         y = np.fft.ifft(self.__y_val)
         return Signal(x, y, time_frame=self.time_frame)
+
+    def periodogram(self, block_size=None):
+        x, y = signal.periodogram(self.__y_val, fs=self.fs, nfft=block_size)
+        return Signal(x, y, domain='frequency', title='Periodogram of ' + self.title)
 
     @property
     def amp(self):
@@ -137,6 +150,16 @@ class Signal:
         if self.domain == 'time':
             raise DomainError('wrong domain you fool!')
         return self.__y_val
+
+    def fft_lim(self, lim):
+        x = np.fft.fftfreq(self.size, self.dt)
+        y = np.fft.fft(self.__y_val)
+        index = int(self.size // (self.fs / lim))
+        fig = plt.figure()
+        plt.stem(x[:index], np.abs(y[:index]) / self.size)
+        plt.grid(True)
+        fig.show()
+        return Signal(x[:index], y[:index], title=self.title, domain='frequency')
 
     def conv(self, sig):
         convolved = signal.convolve(self.__y_val, sig.__y_val, mode='full')
@@ -327,3 +350,17 @@ class Signal:
 
 
 #%%
+audio = Signal.from_wav('/home/daniel/Downloads/audio_1.wav')
+Signal.plot(audio)
+
+#%%
+t = np.linspace(0, 0.016, 2048, endpoint=False)
+y = signal.sawtooth(t * 2 * np.pi * 1000, width=0)
+sig = Signal(t, y, title='Sawtooth')
+sig -= np.mean(sig.amp)
+sig.plot_properties()
+print(np.mean(sig.amp), sig.fs)
+foo = sig.fft_lim(10000)
+
+#%%
+
