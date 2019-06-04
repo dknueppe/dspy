@@ -61,24 +61,30 @@ class Signal:
         return Signal(t, samples, title=title)
 
     def __add__(self, signal):
-        common_x, timeframe = Signal.common_time(self, signal)
-        sig_sum = np.zeros(common_x.size)
-        sig_sum += self.padded(common_x, 0)
-        sig_sum += signal.padded(common_x, 0)
-        return Signal(common_x, sig_sum,title=self.title + ' + ' + signal.title,\
-            time_frame=timeframe)
+        if isinstance(signal, Signal):
+            common_x, timeframe = Signal.common_time(self, signal)
+            sig_sum = np.zeros(common_x.size)
+            sig_sum += self.padded(common_x, 0)
+            sig_sum += signal.padded(common_x, 0)
+            return Signal(common_x, sig_sum,title=self.title + ' + ' + signal.title,\
+                time_frame=timeframe)
+        else:
+            return Signal(self.__x_val, self.__y_val * signal, title=self.title, domain=self.domain)
 
     def __iadd__(self, signal):
         self.__y_val += signal
         return self
     
     def __sub__(self, signal):
-        common_x, timeframe = Signal.common_time(self, signal)
-        sig_sum = np.zeros(common_x.size)
-        sig_sum -= self.padded(common_x, 0)
-        sig_sum -= signal.padded(common_x, 0)
-        return Signal(common_x, sig_sum,title=self.title + ' - ' + signal.title,\
-            time_frame=timeframe)
+        if isinstance(signal, Signal):
+            common_x, timeframe = Signal.common_time(self, signal)
+            sig_sum = np.zeros(common_x.size)
+            sig_sum -= self.padded(common_x, 0)
+            sig_sum -= signal.padded(common_x, 0)
+            return Signal(common_x, sig_sum,title=self.title + ' - ' + signal.title,\
+                time_frame=timeframe)
+        else:
+            return Signal(self.__x_val, self.__y_val * signal, title=self.title, domain=self.domain)
 
     def __isub__(self, signal):
         self.__y_val -= signal
@@ -86,10 +92,17 @@ class Signal:
 
 
     def __mult__(self, signal):
-        common_x, timeframe = Signal.common_time(self, signal)
-        sig_prod = self.padded(common_x, 0) * signal.padded(common_x, 0)
-        return Signal(common_x, sig_prod,title=self.title + ' * ' + signal.title,\
-            time_frame=timeframe)
+        if isinstance(signal, Signal):
+            common_x, timeframe = Signal.common_time(self, signal)
+            sig_prod = self.padded(common_x, 0) * signal.padded(common_x, 0)
+            return Signal(common_x, sig_prod,title=self.title + ' * ' + signal.title,\
+                time_frame=timeframe)
+        else:
+            return Signal(self.__x_val, self.__y_val * signal, title=self.title, domain=self.domain)
+
+    def __imult__(self, signal):
+        self.__y_val *= signal
+        return self
 
     def __iter__(self):
         return self
@@ -155,7 +168,8 @@ class Signal:
         x = np.fft.fftfreq(self.size, self.dt)
         y = np.fft.fft(self.__y_val)
         index = int(self.size // (self.fs / lim))
-        fig = plt.figure()
+        fig = plt.figure(figsize=(12, 90 / 16), dpi=120)
+        plt.title('Spectrum of {}, from 0 to {} HZ'.format(self.title, lim))
         plt.stem(x[:index], np.abs(y[:index]) / self.size)
         plt.grid(True)
         fig.show()
@@ -361,6 +375,7 @@ sig -= np.mean(sig.amp)
 sig.plot_properties()
 print(np.mean(sig.amp), sig.fs)
 foo = sig.fft_lim(10000)
+bar = sig.fft * 2
 
 #%%
 
