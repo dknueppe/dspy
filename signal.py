@@ -144,10 +144,6 @@ class Signal:
         y = np.fft.ifft(self.__y_val)
         return Signal(x, y, time_frame=self.time_frame)
 
-    def periodogram(self, block_size=None):
-        x, y = signal.periodogram(self.__y_val, fs=self.fs, nfft=block_size)
-        return Signal(x, y, domain='frequency', title='Periodogram of ' + self.title)
-
     @property
     def amp(self):
         return self.__y_val
@@ -163,6 +159,21 @@ class Signal:
         if self.domain == 'time':
             raise DomainError('wrong domain you fool!')
         return self.__y_val
+
+    def cancel_freq(self, *args):
+        if self.domain == 'time':
+            raise DomainError('wrong domain you fool!')
+        for freq in args:
+            index = ((freq * self.size) // self.fs)
+            tmp = self.size // 3000
+            amp = (self.__y_val[index - tmp -1] + self.__y_val[index + 1 + tmp]) // 2
+            self.__y_val[index - tmp : index + tmp] = amp
+            self.__y_val[-index - tmp : -index + tmp] = amp
+        return self
+
+    def periodogram(self, block_size=None):
+        x, y = signal.periodogram(self.__y_val, fs=self.fs, nfft=block_size)
+        return Signal(x, y, domain='frequency', title='Periodogram of ' + self.title)
 
     def fft_lim(self, lim):
         x = np.fft.fftfreq(self.size, self.dt)
@@ -206,7 +217,7 @@ class Signal:
         Audio(data=self.__y_val, rate=self.fs, autoplay=True)
 
     def save_as_wav(self, name='Signals.wav'):
-        wav.write(name, self.fs, self.__y_val)
+        wav.write(name, self.fs, self.__y_val.real)
 
     def plot_properties(self):
         fig, subs= plt.subplots(3, 2, figsize=(12, 90 / 16), dpi=120)
@@ -365,8 +376,10 @@ class Signal:
 
 #%%
 audio = Signal.from_wav('/home/daniel/Downloads/audio_1.wav')
-Signal.plot(audio)
-
+audio_fixed = (audio.fft.cancel_freq(1000, 3000)).ifft
+audio_fixed.plot_properties()
+audio_fixed.save_as_wav("filtered.wav")
+Signal.plot(audio, audio.fft, audio_fixed, audio_fixed.fft, columns=2)
 #%%
 t = np.linspace(0, 0.016, 2048, endpoint=False)
 y = signal.sawtooth(t * 2 * np.pi * 1000, width=0)
@@ -375,7 +388,6 @@ sig -= np.mean(sig.amp)
 sig.plot_properties()
 print(np.mean(sig.amp), sig.fs)
 foo = sig.fft_lim(10000)
-bar = sig.fft * 2
 
 #%%
 
