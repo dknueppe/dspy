@@ -90,8 +90,7 @@ class Signal:
         self.__y_val -= signal
         return self
 
-
-    def __mult__(self, signal):
+    def __mul__(self, signal):
         if isinstance(signal, Signal):
             common_x, timeframe = Signal.common_time(self, signal)
             sig_prod = self.padded(common_x, 0) * signal.padded(common_x, 0)
@@ -100,8 +99,21 @@ class Signal:
         else:
             return Signal(self.__x_val, self.__y_val * signal, title=self.title, domain=self.domain)
 
-    def __imult__(self, signal):
+    def __imul__(self, signal):
         self.__y_val *= signal
+        return self
+
+    def __truediv__(self, signal):
+        if isinstance(signal, Signal):
+            common_x, timeframe = Signal.common_time(self, signal)
+            sig_prod = self.padded(common_x, 0) / signal.padded(common_x, 0)
+            return Signal(common_x, sig_prod,title=self.title + ' / ' + signal.title,\
+                time_frame=timeframe)
+        else:
+            return Signal(self.__x_val, self.__y_val / signal, title=self.title, domain=self.domain)
+
+    def __itruediv__(self, signal):
+        self.__y_val /= signal
         return self
 
     def __iter__(self):
@@ -185,6 +197,24 @@ class Signal:
         plt.grid(True)
         fig.show()
         return Signal(x[:index], y[:index], title=self.title, domain='frequency')
+
+    def sample_down(self, r):
+        y = self.__y_val[::r]
+        x = self.__x_val[::r]
+        return Signal(x, y, title=self.title)
+
+    def sample_up(self, r=2):
+        if r != 2:
+            raise NotImplementedError('sorry!')
+        x_tmp = np.zeros(self.size)
+        x_tmp[:-1:1] = self.__x_val[:-1:1] + np.diff(self.__x_val) / 2
+        y_tmp = np.zeros(self.size)
+        y_tmp[:-1:1] = self.__y_val[:-1:1] + np.diff(self.__y_val) / 2
+        x_tmp[-1] = self.__x_val[-1]
+        y_tmp[-1] = self.__y_val[-1]
+        x = (np.stack((self.__x_val, x_tmp))).flatten(order='F')
+        y = (np.stack((self.__y_val, y_tmp))).flatten(order='F')
+        return Signal(x, y, title=self.title)
 
     def conv(self, sig):
         convolved = signal.convolve(self.__y_val, sig.__y_val, mode='full')
@@ -375,19 +405,29 @@ class Signal:
 
 
 #%%
-audio = Signal.from_wav('/home/daniel/Downloads/audio_1.wav')
-audio_fixed = (audio.fft.cancel_freq(1000, 3000)).ifft
-audio_fixed.plot_properties()
-audio_fixed.save_as_wav("filtered.wav")
-Signal.plot(audio, audio.fft, audio_fixed, audio_fixed.fft, columns=2)
-#%%
-t = np.linspace(0, 0.016, 2048, endpoint=False)
-y = signal.sawtooth(t * 2 * np.pi * 1000, width=0)
-sig = Signal(t, y, title='Sawtooth')
-sig -= np.mean(sig.amp)
-sig.plot_properties()
-print(np.mean(sig.amp), sig.fs)
-foo = sig.fft_lim(10000)
+#audio = Signal.from_wav('/home/daniel/Downloads/audio_1.wav')
+#audio_fixed = (audio.fft.cancel_freq(1000, 3000)).ifft
+#audio_fixed.plot_properties()
+#audio_fixed.save_as_wav("filtered.wav")
+#audio_fixed *= 1 / max(abs(audio_fixed.amp))
+#Signal.plot(audio, audio.fft, audio_fixed, audio_fixed.fft, columns=2)
+##%%
+#t = np.linspace(0, 0.016, 2048, endpoint=False)
+#y = signal.sawtooth(t * 2 * np.pi * 1000, width=0)
+#sig = Signal(t, y, title='Sawtooth')
+#sig -= np.mean(sig.amp)
+#sig.plot_properties()
+#print(np.mean(sig.amp), sig.fs)
+#foo = sig.fft_lim(10000)
+#
+##%%
+#audio = Signal.from_wav('/home/daniel/Downloads/audio_2.wav')
+#print(audio.fs)
+#audio = audio.sample_down(r=2)
+#audio.plot_properties()
+#print(audio.fs)
+#audio = audio.sample_up(r=2)
+#audio.plot_properties()
+#print(audio.fs)
 
 #%%
-
