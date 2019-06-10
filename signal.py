@@ -172,6 +172,21 @@ class Signal:
             raise DomainError('wrong domain you fool!')
         return self.__y_val
 
+    def heaviside(self, start = 0, x2 = 1):
+        return np.heaviside(self.__x_val - start, x2)
+
+    def rect(self, start, stop):
+        return self.heaviside(start) - self.heaviside(stop)
+
+    def dirac(self, t = 0):
+        d = np.zeros(self.size)
+        i = int(-(self.__x_val[0] - t) * self.fs)
+        if i < 0:
+            return d
+        else:
+            d[i] = 1
+            return d
+
     def cancel_freq(self, *args):
         if self.domain == 'time':
             raise DomainError('wrong domain you fool!')
@@ -420,14 +435,14 @@ class Signal:
 #print(np.mean(sig.amp), sig.fs)
 #foo = sig.fft_lim(10000)
 #
-##%%
-#audio = Signal.from_wav('/home/daniel/Downloads/audio_2.wav')
-#print(audio.fs)
-#audio = audio.sample_down(r=2)
-#audio.plot_properties()
-#print(audio.fs)
-#audio = audio.sample_up(r=2)
-#audio.plot_properties()
-#print(audio.fs)
+#%%
+audio = Signal.from_wav('/home/daniel/Downloads/audio_2.wav')
+print(audio.fs)
+audio = audio.sample_down(r=2)
+audio.plot_properties()
+print(audio.fs)
+audio = audio.sample_up(r=2)
+audio.plot_properties()
+print(audio.fs)
 
 #%%
