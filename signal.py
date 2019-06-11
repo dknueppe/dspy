@@ -24,9 +24,11 @@ class DomainError(Exception):
     pass
 
 class Signal:
-    """Represents a signal in either time or frequency domain
+    """Represents a signal in either time or frequency domain.
+    The main benefit is, that it handles the domain vector automatically,
+    so no more manual mangling is required
     """
-    version = '0.2'
+    version = '0.3'
 
     def __init__(self, x_val, y_val, domain='time', title='Signal', time_frame=None):
         if x_val.size != y_val.size:
@@ -436,13 +438,13 @@ class Signal:
 #foo = sig.fft_lim(10000)
 #
 #%%
-audio = Signal.from_wav('/home/daniel/Downloads/audio_2.wav')
-print(audio.fs)
-audio = audio.sample_down(r=2)
-audio.plot_properties()
-print(audio.fs)
-audio = audio.sample_up(r=2)
-audio.plot_properties()
-print(audio.fs)
+#audio = Signal.from_wav('/home/daniel/Downloads/audio_2.wav')
+#print(audio.fs)
+#audio = audio.sample_down(r=2)
+#audio.plot_properties()
+#print(audio.fs)
+#audio = audio.sample_up(r=2)
+#audio.plot_properties()
+#print(audio.fs)
 
 #%%
